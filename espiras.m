@@ -1,97 +1,91 @@
-nl = 5;
-N = 50;
-R = 1.5;
-sz = 1;
-I = 300;
-no = 4*pi*1e-7;
-ka = no*I/(4*pi);
-rw = 0.2;
+num_espiras = 5;         % Número de espiras
+pts_espira = 80;         % Puntos por espira
+radio = 1.5;             % Radio de cada anillo
+altura_total = 6;        % Altura total del solenoide
+corriente = 300;         % Corriente
+mu_0 = 4*pi*1e-7;        % Permeabilidad del vacío
+const_BS = mu_0 * corriente / (4*pi); % Constante Biot-Savart
+grosor = 0.2;            % Grosor del alambre
 
-nx = 50;
-ny = 50;
-nz = 50;
-x = linspace(-5, 5, nx);
-y = linspace(-5, 5, ny);
-z = linspace(-5, 5, nz);
-[X, Y, Z] = meshgrid(x, y, z);
+% Malla campo magnetico
+espacioAmpleado = 2.5; 
+lx = 50; ly = 50; lz = 60;  
+xg = linspace(-espacioAmpleado*radio, espacioAmpleado*radio, lx);
+yg = linspace(-espacioAmpleado*radio, espacioAmpleado*radio, ly);
+zg = linspace(-0.5*altura_total, 1.5*altura_total, lz);
 
-Bx = zeros(nx, ny, nz);
-By = zeros(nx, ny, nz);
-Bz = zeros(nx, ny, nz);
 
-theta = linspace(0, 2*pi, N);
+% Inicialización de trayectorias
+x = []; y = []; z = [];
+dx = []; dy = []; dz = [];
 
-figure(1);
-hold on;
-for k = 0:(nl-1)
-    r = R * ones(size(theta));
-    x_ring = r .* cos(theta);
-    y_ring = r .* sin(theta);
-    z_ring = ((k - (nl-1)/2) * sz) * ones(size(theta));
+altura_espira = altura_total / (num_espiras - 1);
 
-    dx_dtheta = gradient(x_ring, theta);
-    dy_dtheta = gradient(y_ring, theta);
-    magnitud = sqrt(dx_dtheta.^2 + dy_dtheta.^2);
-    tangente_x = dx_dtheta ./ magnitud;
-    tangente_y = dy_dtheta ./ magnitud;
-    normal_x = -tangente_y;
-    normal_y = tangente_x;
-    factor_quiebre = 0.2;
-    x_quiebre = x_ring + factor_quiebre * normal_x;
-    y_quiebre = y_ring + factor_quiebre * normal_y;
+% Crear anillos separados verticalmente
+for n = 0:num_espiras-1
+    t = linspace(0, 2*pi, pts_espira);
+    x_espira = radio * cos(t);
+    y_espira = radio * sin(t);
+    z_espira = ones(1, pts_espira) * (n * altura_espira);
 
-    plot3(x_quiebre, y_quiebre, z_ring, 'r-', 'LineWidth', 2);
-    
-    for i = 1:2:N
-        quiver3(x_quiebre(i), y_quiebre(i), z_ring(i), tangente_x(i), tangente_y(i), 0, 'b-');
-    end
+    x = [x, x_espira];
+    y = [y, y_espira];
+    z = [z, z_espira];
 
-    for i = 1:N-1
-        dlx = x_quiebre(i+1) - x_quiebre(i);
-        dly = y_quiebre(i+1) - y_quiebre(i);
-        x_mid = (x_quiebre(i) + x_quiebre(i+1))/2;
-        y_mid = (y_quiebre(i) + y_quiebre(i+1))/2;
-        z_mid = z_ring(i);
-        
-        rx = X - x_mid;
-        ry = Y - y_mid;
-        rz = Z - z_mid;
-        r_magnitud = sqrt(rx.^2 + ry.^2 + rz.^2);
-        r_cubed = r_magnitud.^3 + eps;
+    dt = mean(diff(t));
+    dx = [dx, -radio * sin(t) * dt];
+    dy = [dy,  radio * cos(t) * dt];
+    dz = [dz, zeros(1, pts_espira)];  % No hay componente vertical
+end
 
-        cross_x = dly.*rz;
-        cross_y = -dlx.*rz;
-        cross_z = dlx.*ry - dly.*rx;
+% Inicialización del campo magnético
+Bx = zeros(lx, ly, lz);
+By = zeros(lx, ly, lz);
+Bz = zeros(lx, ly, lz);
 
-        Bx = Bx + ka * cross_x ./ r_cubed;
-        By = By + ka * cross_y ./ r_cubed;
-        Bz = Bz + ka * cross_z ./ r_cubed;
+% Cálculo del campo magnético por Biot-Savart
+for i = 1:lx
+    for j = 1:ly
+        for k = 1:lz
+            for n = 1:length(x)
+                rx = xg(i) - x(n);
+                ry = yg(j) - y(n);
+                rz = zg(k) - z(n);
+                r_norm = sqrt(rx^2 + ry^2 + rz^2);
+                r3 = (r_norm + grosor)^3;
+
+                dBx = const_BS * (dy(n)*rz - dz(n)*ry) / r3;
+                dBy = const_BS * (dz(n)*rx - dx(n)*rz) / r3;
+                dBz = const_BS * (dx(n)*ry - dy(n)*rx) / r3;
+
+                Bx(i,j,k) = Bx(i,j,k) + dBx;
+                By(i,j,k) = By(i,j,k) + dBy;
+                Bz(i,j,k) = Bz(i,j,k) + dBz;
+            end
+        end
     end
 end
 
-[sx, sy, sz_stream] = meshgrid(linspace(-1,1,4), linspace(-1,1,4), linspace(-1,1,4));
-streamline(X, Y, Z, Bx, By, Bz, sx, sy, sz_stream);
-title('Espiras');
-xlabel('x');
-ylabel('y');
-zlabel('z');
-axis equal;
+% Visualización de los anillos (espiras)
+figure(1);
+quiver3(x, y, z, dx, dy, dz, 'r');
 grid on;
 view(3);
-hold off;
+xlabel('X'); ylabel('Y'); zlabel('Z');
+title('Espiras');
+
+% Visualización del campo magnético en plano XZ
+[Xm, Zm] = meshgrid(xg, zg);
+centro_y = round(ly/2);
+Bx_XZ = squeeze(Bx(:,centro_y,:));
+Bz_XZ = squeeze(Bz(:,centro_y,:));
 
 figure(2);
 hold on;
-y_index = round(ny/2);
-B_magnitude = sqrt(Bx(:,y_index,:).^2 + By(:,y_index,:).^2 + Bz(:,y_index,:).^2);
-B_magnitude = squeeze(B_magnitude);
-contourf(x, z, B_magnitude', 20, 'LineColor', 'none');
-colormap('jet');
+pcolor(Xm, Zm, sqrt(Bx_XZ.^2 + Bz_XZ.^2)'.^(1/3));
+shading interp;
+colormap jet;
 colorbar;
-max_B = max(B_magnitude(:));
-clim([0, max_B * 0.8]);
-title('Campo magnetico');
-xlabel('x');
-ylabel('z');
-axis equal;
-hold off;
+streamslice(Xm, Zm, Bx_XZ', Bz_XZ', 3);
+xlabel('X'); ylabel('Z');
+title('Campo magnético');
