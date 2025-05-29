@@ -71,7 +71,7 @@ end
 
 [sx, sy, sz_stream] = meshgrid(linspace(-1,1,4), linspace(-1,1,4), linspace(-1,1,4));
 streamline(X, Y, Z, Bx, By, Bz, sx, sy, sz_stream);
-title('espiras');
+title('Espiras');
 xlabel('x');
 ylabel('y');
 zlabel('z');
@@ -90,7 +90,7 @@ colormap('jet');
 colorbar;
 max_B = max(B_magnitude(:));
 clim([0, max_B * 0.8]);
-title('mapa de calor');
+title('Campo magnetico');
 xlabel('x');
 ylabel('z');
 axis equal;
