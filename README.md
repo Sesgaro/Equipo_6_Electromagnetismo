@@ -5,4 +5,4 @@ Equipo conformado por:
  * Edgar Francisco Arechiga Nuño - A01647054
  * Aldo Emiliano Galván Gomez.   - A07106914
  * Jorge Cardenas Blanco         - A01647246
- * 
+ * Leon Daniel Vilchis Arceo     - A01641413
